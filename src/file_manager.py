@@ -75,7 +75,7 @@ class FileMgr:
 
     def sync_cloud_model_list(self):
         """
-        try get model list from "seeed open-source model list"
+        try get model list from CLOUD_MODEL_CONFIG_URL
         """
         if env_helper.online():
             try:

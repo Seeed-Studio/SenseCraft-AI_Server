@@ -1,4 +1,4 @@
-# Seeed-SenseCraft-AI-Edge
+# SenseCraft-AI-Edge
 
 Run AI Task on your Edge Device.
 

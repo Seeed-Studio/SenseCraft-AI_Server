@@ -1,6 +1,6 @@
-# Seeed SenseCraft-AI UI
+# SenseCraft-AI-webUI
 
-- Deploy SenseCraft-AI-Ui from Seeed Studio, See [its github](https://github.com/Seeed-Studio/SenseCraft-AI-Ui) for more details.
+- Deploy SenseCraft-AI-webUI from Seeed Studio, See [its github](https://github.com/Seeed-Studio/SenseCraft-AI-webUI) for more details.
 
 ## Build dist/
 
@@ -8,9 +8,9 @@
 # maybe don't clone others repo in Edge repo
 cd .. 
 # download Ui repo
-git clone https://github.com/Seeed-Studio/SenseCraft-AI-Ui
+git clone https://github.com/Seeed-Studio/SenseCraft-AI-webUI
 # go to the Ui repo
-cd Seeed-SenseCraft-AI-Ui
+cd SenseCraft-AI-webUI
 # follow documents to build `dist/`
 ls dist/
 ```
@@ -19,9 +19,9 @@ ls dist/
 
 ```sh
 # back to Edge repo
-cd ../Seeed-SenseCraft-AI-Edge
+cd ../SenseCraft-AI-Edge
 # copy dist to Edge repo
-cp ../Seeed-SenseCraft-AI-Ui/dist/ ./ 
+cp ../SenseCraft-AI-webUI/dist/ ./ 
 # scipts/run.sh => `-v $PWD/dist:/opt/dev/dist/ \` will be ok, just run
 bash scipts/run.sh
 ```
@@ -31,6 +31,6 @@ bash scipts/run.sh
 ```sh
 # set EDGEAI_WEB_DIST_PATH to ../xxxx/dist/
 vim scripts/run.sh
-# replace `-v $PWD/dist:/opt/dev/dist/ \` to `-v /path/to/Seeed-SenseCraft-AI-Ui/dist:/opt/dev/dist/ \`
+# replace `-v $PWD/dist:/opt/dev/dist/ \` to `-v /path/to/SenseCraft-AI-webUI/dist:/opt/dev/dist/ \`
 bash scipts/run.sh
 ```
