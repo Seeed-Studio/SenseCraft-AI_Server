@@ -6,7 +6,7 @@ MJPEG (Motion JPEG) is a video compression format that represents moving images 
 
 - localhost: access mjpeg url like this `http://127.0.0.1:46654/stream`
 - LAN: access mjpeg url like this `http://192.168.x.x:46654/stream`
-- some params(all optional), more details check the [urlparams_load()](src/streamer.py):
+- some params(all optional), more details check the [urlparams_load()](../src/streamer.py#L98):
   - `src`: input source, which can be local video, rtsp address, and local camera path
   - `model_id`: The ID of the model is currently from the cloud OSS
   - `quality`: output video quality, 0-100

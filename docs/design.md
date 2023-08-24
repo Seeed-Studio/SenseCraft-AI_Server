@@ -57,6 +57,7 @@ Basic Idea: `cv2.VideoCapture() -[frame]-> yolov8.predict() -[mjpeg-strem]-> bro
 
 ### remote model
 
-- upload `oss/models.json` to your oss
-- in `src/constant.py`, modify `CLOUD_MODEL_CONFIG_URL = "https://your-oss/models/models.json"` to your url
-- use `fileMgr.sync_cloud_model_list()` to sync cloud model list
+- upload [oss/models.json](../oss/models.json) to your oss
+- in `src/constant.py`, modify [CLOUD_MODEL_CONFIG_URL](../src/constant.py#L27) to your oss-url for `models.json`
+- after that, all you need to do is make sure all url can access in online's `models.json`
+- and use `fileMgr.sync_cloud_model_list()` to sync cloud model list, without restart Edge.

@@ -1,4 +1,7 @@
+#!/bin/bash
+# remove old container, if it existed
 sudo docker rm -f edge-gateway-container
+# start new contaniner, mount project's files
 sudo docker run -d --privileged \
 --restart=always \
 --net=host --ipc=bridge --ipc=host --pid=host \
@@ -20,5 +23,5 @@ sudo docker run -d --privileged \
 -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket \
 --name=edge-gateway-container seeedcloud/edge-gateway:mis-1.0 \
 bash -c "python3 /opt/dev/src/main.py"
-
+# follow the logs
 sudo docker logs edge-gateway-container -f

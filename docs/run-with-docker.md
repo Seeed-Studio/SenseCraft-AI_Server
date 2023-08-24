@@ -14,7 +14,7 @@ sudo docker --version
 
 Building a custom image is quite complex, some solutions may be provided in the future. So the recommended method is directly use the image we have already created and pushed.
 
-more details check [seeedcloud/edge-gateway](https://hub.docker.com/r/seeedcloud/edge-gateway/tags)
+See [seeedcloud/edge-gateway](https://hub.docker.com/r/seeedcloud/edge-gateway/tags) for more details.
 
 ```sh
 # can ignore this line, docker will auto-pull before run
