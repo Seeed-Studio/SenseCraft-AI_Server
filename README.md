@@ -20,10 +20,11 @@ An MJPEG server running on your edge device, handling input and output, enabling
 The easiest way is to run it using Docker. If you prefer running the source code directly on your local machine, please refer to the [Advanced Usage](#advanced-usage).
 
 ```sh
-# maker sure Docker installed
+# maker sure Docker installed, and run the Edge in container
 bash scripts/run.sh
 
 # Demo: input[sample.mp4] with model[80-object-detect.engine]
+# the initial startup may take some time.
 # in machine 
 http://localhost:46654/stream?src=sample.mp4&model_id=80-object-detect
 # in other machine

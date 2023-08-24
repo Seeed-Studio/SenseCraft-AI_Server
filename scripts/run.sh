@@ -7,7 +7,7 @@ sudo docker run -d --privileged \
 --net=host --ipc=bridge --ipc=host --pid=host \
 --runtime nvidia --gpus all \
 -e EDGEAI_LOG_LEVEL="20" \
--e EDGEAI_MQTT_STARTUP="ON" \
+-e EDGEAI_MQTT_STARTUP="OFF" \
 -e EDGEAI_ONLINE="OFF" \
 -e EDGEAI_MODELS_PATH="/opt/dev/models/" \
 -e EDGEAI_SOURCES_PATH="/opt/dev/sources/" \
