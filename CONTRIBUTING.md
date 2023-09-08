@@ -2,7 +2,7 @@
 
 Thank you for considering contributing to this project!
 
-Start by [opening an issue](https://github.com/Seeed-Studio/SenseCraft-AI-Edge/issues),
+Start by [opening an issue](https://github.com/Seeed-Studio/SenseCraft-AI_Server/issues),
 whether to identify a problem or outline a change. That issue should be used to
 discuss the situation and agree on a plan of action before writing code or
 sending a pull request. Maybe the problem isn't really a problem, or maybe there
@@ -13,7 +13,7 @@ We appreciate your support and assistance. To ensure a smooth contribution proce
 
 ## Submitting Issues and Suggestions
 
-If you have any questions, suggestions, or feedback, please submit an [Issue](https://github.com/Seeed-Studio/SenseCraft-AI-Edge/issues) on GitHub, and we will respond as soon as possible.
+If you have any questions, suggestions, or feedback, please submit an [Issue](https://github.com/Seeed-Studio/SenseCraft-AI_Server/issues) on GitHub, and we will respond as soon as possible.
 
 ## Contribution Process
 

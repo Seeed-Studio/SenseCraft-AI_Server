@@ -1,10 +1,10 @@
-# SenseCraft-AI-Edge
+# SenseCraft-AI_Server
 
 Run AI Task on your Edge Device.
 
 ## Introduction
 
-An MJPEG server running on your edge device, handling input and output, enabling model switching and parameter configuration.
+The Server running on your edge device, handling input and output, enabling model switching, offering output streaming after inference, and parameter configuration.
 
 ## Features
 

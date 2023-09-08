@@ -19,7 +19,7 @@ ls dist/
 
 ```sh
 # back to Edge repo
-cd ../SenseCraft-AI-Edge
+cd ../SenseCraft-AI_Server
 # copy dist to Edge repo
 cp ../SenseCraft-AI-webUI/dist/ ./ 
 # scipts/run.sh => `-v $PWD/dist:/opt/dev/dist/ \` will be ok, just run
