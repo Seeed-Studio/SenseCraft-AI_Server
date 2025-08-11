@@ -58,4 +58,7 @@ python3 src/main.py
 
 # online mode (will download about 350MB models at first run)
 EDGEAI_ONLINE=ON python3 src/main.py
+
+# Access the web interface
+http://localhost:46654/
 ```

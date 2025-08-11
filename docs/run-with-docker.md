@@ -2,9 +2,10 @@
 
 Using Docker to run is a good way to ignore plenty of dependencies.
 
-Before start everything, make sure your machine installed Docker.
+Before start everything, make sure your machine [installed Docker](https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository).
 
 ```sh
+# Jetson => https://www.jetson-ai-lab.com/tips_ssd-docker.html#docker
 # check the output
 sudo docker --version
 # such as `Docker version 20.10.21, build 20.10.21-0ubuntu1~20.04.2` is OK to go
@@ -17,10 +18,28 @@ Building a custom image is quite complex, some solutions may be provided in the 
 See [seeedcloud/edge-gateway](https://hub.docker.com/r/seeedcloud/edge-gateway/tags) for more details.
 
 ```sh
-# can ignore this line, docker will auto-pull before run
-docker pull seeedcloud/edge-gateway:mis-1.0
-# if you had mqtt-broker, make sure `-e EDGEAI_MQTT_STARTUP="ON"`, default mqtt is OFF
+# The script will automatically check and build the Docker image
 bash scripts/run.sh
+
+# The script will:
+# 1. Check if 'scas' image exists, build if needed
+# 2. Check MQTT service status (port 1883)
+# 3. Start SenseCraft AI Server
+
+# Access the web interface
+http://localhost:46654/
+```
+
+### MQTT Service Management
+```sh
+# Check MQTT service status
+./scripts/mqtt.sh status
+
+# Start MQTT service
+./scripts/mqtt.sh start
+
+# Install MQTT service (if not installed)
+./scripts/mqtt.sh install
 ```
 
 ## Custom Image

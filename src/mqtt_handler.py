@@ -39,36 +39,57 @@ class MqttHandler(MqttDriver):
         )
         self.sub_topics = [CMD_TOPIC]
         self.client.on_message = self.on_message
+        MqttHandler.init_flag = True
 
-    def on_connect(self, client, userdata, flags, rc):
+    def __del__(self):
+        """析构函数，确保清理资源"""
+        try:
+            self.cleanup()
+        except Exception as e:
+            logging.debug(f"MqttHandler清理时出现异常（可忽略）: {e}")
+
+    def on_connect(self, client, userdata, flags, reason_code, properties):
         logging.debug(
-            "on_connect[{}:{}] {} {} {} {}".format(
-                self.broker, self.port, client, userdata, flags, rc
+            "on_connect[{}:{}] {} {} {} {} {}".format(
+                self.broker, self.port, client, userdata, flags, reason_code, properties
             )
         )
-        if rc == 0:
+        if reason_code == 0:
             logging.debug("connected, sub: {}".format(self.sub_topics))
             for topic in self.sub_topics:
                 self.client.subscribe(topic)
             # mjpeg server startup
             self.start_streamserver()
         else:
-            logging.error("on_connect failed: %d\n", rc)
+            logging.error("on_connect failed: %d\n", reason_code)
 
     def start_streamserver(self):
-        self.server = StreamingServer(env_helper.web_ip_port(), StreamingHandler)
-        self.server.mqtt_driver = self
-        self.server.serve_forever()
+        try:
+            self.server = StreamingServer(env_helper.web_ip_port(), StreamingHandler)
+            self.server.mqtt_driver = self
+            self.server.serve_forever()
+        except Exception as e:
+            logging.error(f"启动流媒体服务器失败: {e}")
 
     def on_message(self, client, userdata, message):
-        topic = message.topic
-        rawMsg = message.payload.decode()
-        logging.debug(f"recv `{rawMsg}` from `{topic}`")
-        if topic == CMD_TOPIC:
-            logging.info(f"recv `{rawMsg}` from `{topic}`")
-        else:
-            logging.debug("unhandler topic: %s" % topic)
+        try:
+            topic = message.topic
+            rawMsg = message.payload.decode()
+            logging.debug(f"recv `{rawMsg}` from `{topic}`")
+            if topic == CMD_TOPIC:
+                logging.info(f"recv `{rawMsg}` from `{topic}`")
+            else:
+                logging.debug("unhandler topic: %s" % topic)
+        except Exception as e:
+            logging.error(f"处理MQTT消息时出错: {e}")
 
     def run(self):
         logging.info("mqtt client run... {}".format(self.broker))
-        self.client.loop_forever()
+        try:
+            self.client.loop_forever()
+        except KeyboardInterrupt:
+            logging.info("收到停止信号，正在关闭MQTT客户端...")
+        except Exception as e:
+            logging.error(f"MQTT客户端运行出错: {e}")
+        finally:
+            self.cleanup()

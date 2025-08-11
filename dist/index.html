@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SenseCraft AI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="industrial-container">
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+      <div class="navbar-brand">
+        <h1>SenseCraft AI</h1>
+      </div>
+      <ul class="navbar-nav">
+        <li><span class="nav-link" id="currentTime"> 加载中...</span></li>
+      </ul>
+    </nav>
+
+    <!-- 主内容区域 -->
+    <div class="main-content">
+      <!-- 视频监控区域 -->
+      <div class="video-section">
+        <div class="video-container">
+          <img id="videoStream" class="video-stream" style="display: none;" alt="AI推理视频流">
+          <div id="videoPlaceholder" class="video-placeholder">
+            <p>🔄 正在加载配置并启动监控...</p>
+          </div>
+        </div>
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <p>正在连接视频流...</p>
+        </div>
+
+        <!-- 绊线计数面板 -->
+        <div id="lineCrossingPanel" class="line-crossing-panel" style="display: none;">
+          <div class="panel-header">
+            <h3>📏 人数统计</h3>
+          </div>
+          <div class="panel-content">
+            <div class="count-item">
+              <span class="count-label">进入:</span>
+              <span class="count-value" id="enterCount">0</span>
+            </div>
+            <div class="count-item">
+              <span class="count-label">离开:</span>
+              <span class="count-value" id="exitCount">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    class MonitorController {
+      constructor() {
+        this.isStreaming = false;
+        this.isPaused = false;
+        this.currentUrl = '';
+        this.startTime = null;
+        this.statsInterval = null;
+        this.mqttInterval = null;
+
+        this.initializeElements();
+        this.initializeEventListeners();
+        this.startStatsMonitoring();
+        // 自动启动监控
+        this.autoStartMonitoring();
+      }
+
+      initializeElements() {
+        this.videoElement = document.getElementById('videoStream');
+        this.placeholder = document.getElementById('videoPlaceholder');
+        this.loading = document.getElementById('loading');
+        this.currentTimeElement = document.getElementById('currentTime');
+        this.lineCrossingPanel = document.getElementById('lineCrossingPanel');
+        this.enterCountElement = document.getElementById('enterCount');
+        this.exitCountElement = document.getElementById('exitCount');
+        // 移除对不存在按钮的引用
+        // this.startBtn = document.getElementById('startBtn');
+        // this.stopBtn = document.getElementById('stopBtn');
+        // this.pauseBtn = document.getElementById('pauseBtn');
+        // this.resumeBtn = document.getElementById('resumeBtn');
+        // this.clearTrailsBtn = document.getElementById('clearTrailsBtn');
+        // this.refreshBtn = document.getElementById('refreshBtn');
+      }
+
+      initializeEventListeners() {
+        // 移除所有按钮事件监听器，因为不再需要手动控制
+      }
+
+      async autoStartMonitoring() {
+        try {
+          // 优先从服务器获取配置
+          let config;
+          try {
+            const response = await industrialMonitor.request('/appConfigs');
+            config = response || {};
+            console.log('从服务器获取配置:', config);
+          } catch (error) {
+            console.warn('从服务器获取配置失败，使用本地配置:', error);
+            // 如果服务器获取失败，使用本地配置
+            config = industrialMonitor.storage.get('appConfig', {
+              src: 'sample.mp4',
+              model_id: '',
+              conf: '0.25',
+              max_det: '300',
+              show_fps: '1',
+              show_time: '1',
+              show_box: '1',
+              track: '1',
+              show_trail: '1',
+              trail_length: '50',
+              trail_thickness: '2'
+            });
+          }
+
+          // 检查配置是否有效
+          if (!config.src || !config.model_id) {
+            this.placeholder.innerHTML = '<p>⚠️ 配置不完整，请先到配置页面设置视频源和模型</p>';
+            industrialMonitor.showNotification('配置不完整，请先到配置页面设置视频源和模型', 'error');
+            return;
+          }
+
+          this.currentUrl = industrialMonitor.buildStreamUrl(config);
+          industrialMonitor.showLoading(true);
+
+          // 显示视频流
+          this.videoElement.src = this.currentUrl;
+          this.videoElement.style.display = 'block';
+          this.placeholder.style.display = 'none';
+
+          // 视频加载事件
+          this.videoElement.onload = () => {
+            industrialMonitor.showLoading(false);
+            this.isStreaming = true;
+            this.startTime = new Date();
+            this.startMqttMonitoring();
+            industrialMonitor.showNotification('监控已自动启动', 'success');
+          };
+
+          this.videoElement.onerror = () => {
+            industrialMonitor.showLoading(false);
+            this.videoElement.style.display = 'none';
+            this.placeholder.style.display = 'block';
+            this.showReconnectOptions();
+            industrialMonitor.showNotification('连接失败，请检查配置或重新连接', 'error');
+          };
+
+        } catch (error) {
+          console.error('自动启动监控失败:', error);
+          industrialMonitor.showNotification('自动启动失败: ' + error.message, 'error');
+        }
+      }
+
+      async startMonitoring() {
+        // 保留原有方法以支持手动启动
+        await this.autoStartMonitoring();
+      }
+
+      stopMonitoring() {
+        this.videoElement.src = '';
+        this.videoElement.style.display = 'none';
+        this.placeholder.style.display = 'block';
+        this.isStreaming = false;
+        this.isPaused = false;
+        this.startTime = null;
+        this.stopMqttMonitoring();
+        industrialMonitor.showNotification('监控已停止', 'info');
+      }
+
+      pauseMonitoring() {
+        this.isPaused = true;
+        this.videoElement.style.display = 'none';
+        this.placeholder.innerHTML = '<p>⏸️ 监控已暂停</p>';
+        this.placeholder.style.display = 'block';
+        industrialMonitor.showNotification('监控已暂停', 'warning');
+      }
+
+      resumeMonitoring() {
+        this.isPaused = false;
+        this.videoElement.style.display = 'block';
+        this.placeholder.style.display = 'none';
+        industrialMonitor.showNotification('监控已恢复', 'success');
+      }
+
+      toggleFullscreen() {
+        // 全屏功能已移除
+        console.log('全屏功能已移除');
+      }
+
+      handleFullscreenChange() {
+        // 全屏功能已移除
+        console.log('全屏状态改变');
+      }
+
+      async clearTrails() {
+        try {
+          const response = await industrialMonitor.request('/track/clear');
+          industrialMonitor.showNotification('轨迹已清理', 'success');
+        } catch (error) {
+          console.error('清理轨迹失败:', error);
+          industrialMonitor.showNotification('清理失败: ' + error.message, 'error');
+        }
+      }
+
+      async refreshData() {
+        await this.loadMqttData();
+        industrialMonitor.showNotification('数据已刷新', 'success');
+      }
+
+      startStatsMonitoring() {
+        this.updateCurrentTime(); // 立即更新一次时间
+        this.statsInterval = setInterval(() => {
+          this.updateCurrentTime();
+        }, 1000);
+      }
+
+      updateCurrentTime() {
+        const now = new Date();
+        const timeString = now.toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        this.currentTimeElement.textContent = `${timeString}`;
+      }
+
+      startMqttMonitoring() {
+        this.loadMqttData(); // 立即加载一次
+        this.mqttInterval = setInterval(() => {
+          this.loadMqttData();
+        }, 2000);
+      }
+
+      stopMqttMonitoring() {
+        if (this.mqttInterval) {
+          clearInterval(this.mqttInterval);
+          this.mqttInterval = null;
+        }
+      }
+
+      async loadMqttData() {
+        try {
+          const response = await industrialMonitor.request('/mqtt/data');
+          this.updateDetectionDisplay(response.data || response);
+        } catch (error) {
+          console.error('加载MQTT数据失败:', error);
+        }
+      }
+
+      updateDetectionDisplay(mqttData) {
+        // 移除对不存在元素的引用
+        // const detectionList = document.getElementById('detectionList');
+        // if (!detectionList) return;
+
+        // if (mqttData.info && Object.keys(mqttData.info).length > 0) {
+        //   detectionList.innerHTML = '';
+
+        //   Object.entries(mqttData.info).forEach(([name, count]) => {
+        //     const item = document.createElement('div');
+        //     item.className = 'detection-item';
+        //     item.innerHTML = `
+        //       <span class="detection-name">${industrialMonitor.translateDetectionName(name)}</span>
+        //       <span class="detection-count">${count}</span>
+        //     `;
+        //     detectionList.appendChild(item);
+        //   });
+        // } else {
+        //   detectionList.innerHTML = `
+        //     <div class="text-center" style="color: var(--text-muted); padding: 20px;">
+        //       暂无检测数据
+        //     </div>
+        //   `;
+        // }
+
+        // 更新绊线计数显示
+        this.updateLineCrossingDisplay(mqttData);
+      }
+
+      updateLineCrossingDisplay(mqttData) {
+        if (mqttData.line_crossing) {
+          const enterCount = mqttData.line_crossing.enter || 0;
+          const exitCount = mqttData.line_crossing.exit || 0;
+
+          this.enterCountElement.textContent = enterCount;
+          this.exitCountElement.textContent = exitCount;
+
+          // 显示绊线面板
+          this.lineCrossingPanel.style.display = 'block';
+        } else {
+          // 隐藏绊线面板
+          this.lineCrossingPanel.style.display = 'none';
+        }
+      }
+
+      showReconnectOptions() {
+        this.placeholder.innerHTML = `
+          <div class="reconnect-options">
+            <p>❌ 连接失败</p>
+            <div class="btn-group" style="margin-top: 20px;">
+              <button class="btn btn-primary" onclick="monitorController.reconnect()">🔄 重新连接</button>
+              <button class="btn btn-secondary" onclick="monitorController.goToConfig()">⚙️ 检查配置</button>
+            </div>
+            <div class="btn-group" style="margin-top: 10px;">
+              <button class="btn btn-warning" onclick="monitorController.retryWithLocalConfig()">📁 使用本地配置重试</button>
+            </div>
+          </div>
+        `;
+      }
+
+      async reconnect() {
+        industrialMonitor.showNotification('正在重新连接...', 'info');
+        await this.startMonitoring();
+      }
+
+      goToConfig() {
+        window.location.href = 'config.html';
+      }
+
+      async retryWithLocalConfig() {
+        industrialMonitor.showNotification('使用本地配置重试连接...', 'info');
+        const localConfig = industrialMonitor.storage.get('appConfig', {});
+        if (Object.keys(localConfig).length === 0) {
+          industrialMonitor.showNotification('本地没有保存的配置', 'error');
+          return;
+        }
+
+        try {
+          this.currentUrl = industrialMonitor.buildStreamUrl(localConfig);
+          industrialMonitor.showLoading(true);
+          industrialMonitor.updateStatus('使用本地配置连接中...', false);
+
+          this.videoElement.src = this.currentUrl;
+          this.videoElement.style.display = 'block';
+          this.placeholder.style.display = 'none';
+
+          this.videoElement.onload = () => {
+            industrialMonitor.showLoading(false);
+            this.isStreaming = true;
+            this.startTime = new Date();
+            industrialMonitor.updateStatus('已连接(本地配置)', true);
+            // this.updateButtons(); // 移除对不存在方法的引用
+            this.startMqttMonitoring();
+            industrialMonitor.showNotification('使用本地配置连接成功', 'success');
+          };
+
+          this.videoElement.onerror = () => {
+            industrialMonitor.showLoading(false);
+            industrialMonitor.updateStatus('本地配置连接失败', false);
+            this.videoElement.style.display = 'none';
+            this.placeholder.style.display = 'block';
+            this.showReconnectOptions();
+            industrialMonitor.showNotification('本地配置连接也失败，请检查配置', 'error');
+          };
+        } catch (error) {
+          console.error('使用本地配置重试失败:', error);
+          industrialMonitor.showNotification('重试失败: ' + error.message, 'error');
+        }
+      }
+    }
+
+    // 初始化监控控制器
+    let monitorController;
+    document.addEventListener('DOMContentLoaded', () => {
+      monitorController = new MonitorController();
+    });
+  </script>
+</body>
+
+</html>

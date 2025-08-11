@@ -7,7 +7,7 @@ from output import StreamingOutput
 
 
 class Camera:
-    def __init__(self, output: StreamingOutput, url, modelpath, task):
+    def __init__(self, output: StreamingOutput, url, modelpath, task, classes=None):
         self.output = output
         self.url = url
         self.modelpath = modelpath
@@ -21,6 +21,12 @@ class Camera:
         task= 'detect', 'segment', 'classify', or 'pose'
         """
 
+        # 设置classes参数，默认为[0]
+        if classes is not None:
+            self.predictParams["classes"] = classes
+        else:
+            self.predictParams["classes"] = [0]
+
         self.reconnect_interval = 1
         """
         reconnect interval, default is 1 seconds
@@ -33,8 +39,13 @@ class Camera:
         else:
             self.init_stream()
         logging.info(
-            "src[{}] fps[{}] width[{}] height[{}] model[{}]".format(
-                self.url, self.fps, self.width, self.height, self.modelpath
+            "src[{}] fps[{}] width[{}] height[{}] model[{}] classes[{}]".format(
+                self.url,
+                self.fps,
+                self.width,
+                self.height,
+                self.modelpath,
+                self.predictParams.get("classes", [0]),
             )
         )
         self.model = YOLO(self.modelpath, task=self.task)
@@ -149,6 +160,7 @@ class Camera:
             results = self.model.track(
                 frame,
                 device="0",
+                classes=[0],
                 persist=True,
                 tracker="bytetrack.yaml",
                 verbose=False,
@@ -156,6 +168,6 @@ class Camera:
             )
         else:
             results = self.model.predict(
-                frame, device="0", verbose=False, **self.predictParams
+                frame, device="0", verbose=False, classes=[0], **self.predictParams
             )
         self.output.write(results)

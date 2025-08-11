@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>折叠功能演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+        }
+
+        .collapsible-section {
+            margin-top: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .collapsible-header:hover {
+            background: #e9ecef;
+        }
+
+        .collapsible-header h4 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1em;
+        }
+
+        .collapsible-icon {
+            font-size: 12px;
+            color: #6c757d;
+            transition: transform 0.3s ease;
+        }
+
+        .collapsible-content {
+            background: white;
+            padding: 15px;
+            border-top: none;
+        }
+
+        .collapsible-section.expanded .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        .demo-content {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 折叠功能演示</h1>
+            <p>点击标题栏可以展开或折叠内容区域</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-success" id="toggleAllBtn" onclick="toggleAll()">展开全部</button>
+        </div>
+
+        <div class="collapsible-section">
+            <div class="collapsible-header" onclick="toggleSection('section1')">
+                <h4>📤 上传视频源</h4>
+                <span class="collapsible-icon">▼</span>
+            </div>
+            <div id="section1" class="collapsible-content" style="display: none;">
+                <div class="demo-content">
+                    <h3>视频源上传区域</h3>
+                    <p>这里可以上传各种格式的视频文件</p>
+                    <p>支持：MP4, AVI, MOV, MKV</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="collapsible-section">
+            <div class="collapsible-header" onclick="toggleSection('section2')">
+                <h4>🗂️ 视频源管理</h4>
+                <span class="collapsible-icon">▼</span>
+            </div>
+            <div id="section2" class="collapsible-content" style="display: none;">
+                <div class="demo-content">
+                    <h3>视频源管理区域</h3>
+                    <p>这里可以管理已上传的视频文件</p>
+                    <p>支持删除、重命名等操作</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="collapsible-section">
+            <div class="collapsible-header" onclick="toggleSection('section3')">
+                <h4>📤 上传AI模型</h4>
+                <span class="collapsible-icon">▼</span>
+            </div>
+            <div id="section3" class="collapsible-content" style="display: none;">
+                <div class="demo-content">
+                    <h3>AI模型上传区域</h3>
+                    <p>这里可以上传各种格式的AI模型</p>
+                    <p>支持：PT, PTH, ONNX, ENGINE</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="collapsible-section">
+            <div class="collapsible-header" onclick="toggleSection('section4')">
+                <h4>🗂️ 模型管理</h4>
+                <span class="collapsible-icon">▼</span>
+            </div>
+            <div id="section4" class="collapsible-content" style="display: none;">
+                <div class="demo-content">
+                    <h3>模型管理区域</h3>
+                    <p>这里可以管理已上传的AI模型</p>
+                    <p>支持删除、重载等操作</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId);
+            const section = content.closest('.collapsible-section');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                section.classList.add('expanded');
+            } else {
+                content.style.display = 'none';
+                section.classList.remove('expanded');
+            }
+            
+            updateToggleButtonText();
+        }
+
+        function toggleAll() {
+            const sections = ['section1', 'section2', 'section3', 'section4'];
+            const allExpanded = sections.every(sectionId => {
+                const content = document.getElementById(sectionId);
+                return content.style.display !== 'none';
+            });
+            
+            const toggleBtn = document.getElementById('toggleAllBtn');
+            
+            if (allExpanded) {
+                // 如果全部已展开，则折叠全部
+                sections.forEach(sectionId => {
+                    const content = document.getElementById(sectionId);
+                    const section = content.closest('.collapsible-section');
+                    content.style.display = 'none';
+                    section.classList.remove('expanded');
+                });
+                toggleBtn.textContent = '展开全部';
+            } else {
+                // 否则展开全部
+                sections.forEach(sectionId => {
+                    const content = document.getElementById(sectionId);
+                    const section = content.closest('.collapsible-section');
+                    content.style.display = 'block';
+                    section.classList.add('expanded');
+                });
+                toggleBtn.textContent = '折叠全部';
+            }
+        }
+
+        function updateToggleButtonText() {
+            const sections = ['section1', 'section2', 'section3', 'section4'];
+            const allExpanded = sections.every(sectionId => {
+                const content = document.getElementById(sectionId);
+                return content.style.display !== 'none';
+            });
+            
+            const toggleBtn = document.getElementById('toggleAllBtn');
+            toggleBtn.textContent = allExpanded ? '折叠全部' : '展开全部';
+        }
+    </script>
+</body>
+</html> 

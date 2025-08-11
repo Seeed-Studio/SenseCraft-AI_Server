@@ -3,68 +3,22 @@ import os
 import time
 import json
 import traceback
-import requests
 import cv2
-from numba import cuda
 import numpy as np
 import subprocess
 import env_helper
+from PIL import Image
 
-
-def download(url, path, timeout=None):
-    logging.info("------download start------")
-    start = date_now()
-    logging.info("url: {}".format(url))
-    logging.info("save: {}".format(path))
-    try:
-        response = requests.get(url, timeout=timeout)
-        if response.status_code == 200:
-            content = response.content
-            with open(path, "wb") as f:
-                f.write(content)
-            logging.info("download success")
-        else:
-            logging.error("download failed: code={}".format(response.status_code))
-    except Exception as e:
-        logging.error(str(traceback.format_exc()))
-        logging.error("download error: {}".format(str(e)))
-    logging.info("all cost {} ms".format(date_now() - start))
-    logging.info("------download done-------")
-
-
-@cuda.jit
-def tile_image(frame, result):
-    x, y, z = cuda.grid(3)
-    if x < result.shape[0] and y < result.shape[1] and z < result.shape[2]:
-        i = x % frame.shape[0]
-        j = y % frame.shape[1]
-        result[x, y, z] = frame[i, j, z]
-
-
+import io
 def jpg(frame, quality=100):
-    """
-    format 'frame' to 'jpg'
-    - quality: int[0,100]
-    """
-    # CUDA Hardware acceleration
-    result = np.zeros(
-        (frame.shape[0], frame.shape[1], frame.shape[2]), dtype=frame.dtype
-    )
-    frame_device = cuda.to_device(frame)
-    result_device = cuda.device_array_like(result)
-    threadsperblock = (16, 16, 3)
-    blockspergrid_x = int(np.ceil(result.shape[0] / threadsperblock[0]))
-    blockspergrid_y = int(np.ceil(result.shape[1] / threadsperblock[1]))
-    blockspergrid_z = int(np.ceil(result.shape[2] / threadsperblock[2]))
-    blockspergrid = (blockspergrid_x, blockspergrid_y, blockspergrid_z)
-    tile_image[blockspergrid, threadsperblock](frame_device, result_device)
-    result = result_device.copy_to_host()
-    # CUDA Hardware acceleration
-    ret, buffer = cv2.imencode(".jpg", result, [cv2.IMWRITE_JPEG_QUALITY, quality])
-    if ret:
-        return buffer.tobytes()
-    else:
-        return None
+    # 转换OpenCV BGR格式为RGB
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # 使用Pillow保存为JPEG字节流
+    img = Image.fromarray(rgb_frame)
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format='JPEG', quality=quality, optimize=True)
+    return img_bytes.getvalue()
+
 
 
 def list_freecam():

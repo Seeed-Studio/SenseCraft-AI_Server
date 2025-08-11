@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .upload-section {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .upload-section:hover {
+            border-color: #3498db;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #2980b9;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>文件上传功能测试</h1>
+    
+    <div class="upload-section">
+        <h3>视频源上传测试</h3>
+        <div class="form-group">
+            <label for="videoUpload">选择视频文件</label>
+            <input type="file" id="videoUpload" class="form-control" accept="video/*,.mp4,.avi,.mov,.mkv" multiple>
+        </div>
+        <button id="uploadVideoBtn" class="btn">上传视频</button>
+        <div id="videoStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <div class="upload-section">
+        <h3>模型文件上传测试</h3>
+        <div class="form-group">
+            <label for="modelUpload">选择模型文件</label>
+            <input type="file" id="modelUpload" class="form-control" accept=".pt,.pth,.onnx,.engine" multiple>
+        </div>
+        <button id="uploadModelBtn" class="btn">上传模型</button>
+        <div id="modelStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <div class="upload-section">
+        <h3>API测试</h3>
+        <button id="testSourcesBtn" class="btn">测试获取视频源列表</button>
+        <button id="testModelsBtn" class="btn">测试获取模型列表</button>
+        <div id="apiStatus" class="status" style="display: none;"></div>
+    </div>
+
+    <script>
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        async function uploadFiles(fileInput, statusId, type) {
+            const files = fileInput.files;
+            if (files.length === 0) {
+                showStatus(statusId, '请选择文件', 'error');
+                return;
+            }
+
+            showStatus(statusId, '正在上传...', 'info');
+
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.message || `上传失败: ${file.name}`);
+                    }
+
+                    const result = await response.json();
+                    if (!result.success) {
+                        throw new Error(result.message || `上传失败: ${file.name}`);
+                    }
+                }
+
+                showStatus(statusId, `成功上传 ${files.length} 个${type}文件`, 'success');
+                fileInput.value = '';
+
+            } catch (error) {
+                console.error('上传失败:', error);
+                showStatus(statusId, '上传失败: ' + error.message, 'error');
+            }
+        }
+
+        async function testAPI(endpoint, statusId, name) {
+            try {
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    const data = await response.json();
+                    showStatus(statusId, `${name}获取成功，共 ${data.list.length} 个项目`, 'success');
+                } else {
+                    throw new Error('请求失败');
+                }
+            } catch (error) {
+                console.error('API测试失败:', error);
+                showStatus(statusId, `${name}测试失败: ` + error.message, 'error');
+            }
+        }
+
+        document.getElementById('uploadVideoBtn').addEventListener('click', () => {
+            uploadFiles(document.getElementById('videoUpload'), 'videoStatus', '视频');
+        });
+
+        document.getElementById('uploadModelBtn').addEventListener('click', () => {
+            uploadFiles(document.getElementById('modelUpload'), 'modelStatus', '模型');
+        });
+
+        document.getElementById('testSourcesBtn').addEventListener('click', () => {
+            testAPI('/sources/list', 'apiStatus', '视频源列表');
+        });
+
+        document.getElementById('testModelsBtn').addEventListener('click', () => {
+            testAPI('/models/list', 'apiStatus', '模型列表');
+        });
+    </script>
+</body>
+</html> 

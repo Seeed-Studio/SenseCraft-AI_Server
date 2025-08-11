@@ -1,1 +1,30 @@
-{"streams": []}
+{
+  "streams": [],
+  "src": "sample.mp4",
+  "model_id": "a.person",
+  "conf": "0.7",
+  "max_det": "301",
+  "half": "0",
+  "show_fps": "0",
+  "show_time": "0",
+  "show_box": "1",
+  "box_color": "orange",
+  "track": "1",
+  "show_trail": "1",
+  "trail_length": "20",
+  "trail_thickness": "5",
+  "trail_color": "blue",
+  "line_crossing": {
+    "enabled": true,
+    "direction": "vertical",
+    "x1": 550,
+    "y1": 40,
+    "x2": 540,
+    "y2": 630,
+    "tolerance": 5,
+    "color": "red",
+    "thickness": 10,
+    "show_line": true,
+    "show_counts": false
+  }
+}

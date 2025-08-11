@@ -13,7 +13,6 @@ EDGEAI_CONFIGS_PATH = 9
 EDGEAI_WEB_DIST_PATH = 10
 EDGEAI_MQTT_USER = 11
 EDGEAI_MQTT_PWD = 12
-EDGEAI_ONLINE = 13
 # TODO: maybe using config.ini is better
 ENV_NAME = {
     EDGEAI_MQTT_IP: "EDGEAI_MQTT_IP",
@@ -28,13 +27,13 @@ ENV_NAME = {
     EDGEAI_WEB_DIST_PATH: "EDGEAI_WEB_DIST_PATH",
     EDGEAI_MQTT_USER: "EDGEAI_MQTT_USER",
     EDGEAI_MQTT_PWD: "EDGEAI_MQTT_PWD",
-    EDGEAI_ONLINE: "EDGEAI_ONLINE",
 }
 
 
 def online():
-    if os.environ.get(ENV_NAME[EDGEAI_ONLINE]) == "ON":
-        return True
+    """
+    为了兼容性保留此函数，但始终返回False（本地模式）
+    """
     return False
 
 
