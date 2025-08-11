@@ -19,41 +19,50 @@ function install_docker() {
   print_msg "Step 1: Installing Docker"
 
   if check_command docker; then
-    echo "Docker is already installed, skipping."
-  else
-    echo "Updating apt and installing prerequisites..."
-    sudo apt update
-    sudo apt install -y nvidia-container-toolkit curl jq
-
-    echo "Downloading Docker install script..."
-    curl -fsSL https://get.docker.com -o install-docker.sh
-
-    echo "Installing Docker version $DOCKER_VERSION..."
-    sudo sh install-docker.sh --version $DOCKER_VERSION
-
-    echo "Enabling Docker service..."
-    sudo systemctl --now enable docker
-
-    echo "Configuring NVIDIA Container Toolkit for Docker runtime..."
-    sudo nvidia-ctk runtime configure --runtime=docker
-
-    echo "Updating Docker daemon.json to set default-runtime to nvidia..."
-    if [ -f /etc/docker/daemon.json ]; then
-      sudo jq '. + {"default-runtime": "nvidia"}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
-      sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+    CURRENT_VERSION=$(docker --version | awk '{print $3}' | cut -d'.' -f1-2)
+    echo "Detected Docker version: $CURRENT_VERSION"
+    if [[ "$CURRENT_VERSION" == 27.* ]]; then
+      echo "Docker version is already 27.x, skipping installation."
+      return
     else
-      echo '{"default-runtime": "nvidia"}' | sudo tee /etc/docker/daemon.json
+      echo "Docker version is not 27.x, removing current installation..."
+      sudo apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras
+      sudo apt-get autoremove -y
     fi
-
-    echo "Reloading and restarting Docker service..."
-    sudo systemctl daemon-reload
-    sudo systemctl restart docker
-
-    echo "Cleaning up install script..."
-    rm -f install-docker.sh
-
-    echo "Docker installation completed."
   fi
+
+  echo "Updating apt and installing prerequisites..."
+  sudo apt update
+  sudo apt install -y nvidia-container-toolkit curl jq
+
+  echo "Downloading Docker install script..."
+  curl -fsSL https://get.docker.com -o install-docker.sh
+
+  echo "Installing Docker version $DOCKER_VERSION..."
+  sudo sh install-docker.sh --version $DOCKER_VERSION
+
+  echo "Enabling Docker service..."
+  sudo systemctl --now enable docker
+
+  echo "Configuring NVIDIA Container Toolkit for Docker runtime..."
+  sudo nvidia-ctk runtime configure --runtime=docker
+
+  echo "Updating Docker daemon.json to set default-runtime to nvidia..."
+  if [ -f /etc/docker/daemon.json ]; then
+    sudo jq '. + {"default-runtime": "nvidia"}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
+    sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+  else
+    echo '{"default-runtime": "nvidia"}' | sudo tee /etc/docker/daemon.json
+  fi
+
+  echo "Reloading and restarting Docker service..."
+  sudo systemctl daemon-reload
+  sudo systemctl restart docker
+
+  echo "Cleaning up install script..."
+  rm -f install-docker.sh
+
+  echo "Docker installation completed."
 }
 
 function install_mqtt() {
