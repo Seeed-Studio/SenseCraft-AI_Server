@@ -96,7 +96,7 @@ function install_service() {
   git checkout "$BRANCH_TAG"
 
   echo "Running service startup script..."
-  bash scripts/run.sh
+  sudo bash scripts/run.sh
 
   if [ ! -f "yolo11n.pt" ]; then
     echo "Downloading YOLOv11 general model..."
