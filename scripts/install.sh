@@ -104,9 +104,6 @@ function install_service() {
   echo "Checking out "$BRANCH_TAG" branch..."
   git checkout "$BRANCH_TAG"
 
-  echo "Running service startup script..."
-  sudo bash scripts/run.sh
-
   MODEL_DIR="$REPO_DIR/models"
   mkdir -p "$MODEL_DIR"
   if [ ! -f "$MODEL_DIR/yolo11n.pt" ]; then
@@ -115,6 +112,9 @@ function install_service() {
   else
     echo "YOLOv11 model already downloaded in $MODEL_DIR, skipping."
   fi
+
+  echo "Running service startup script..."
+  sudo bash scripts/run.sh
 
   echo "SenseCraft AI Server setup completed."
 }
