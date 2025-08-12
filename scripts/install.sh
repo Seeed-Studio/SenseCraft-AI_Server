@@ -107,11 +107,13 @@ function install_service() {
   echo "Running service startup script..."
   sudo bash scripts/run.sh
 
-  if [ ! -f "yolo11n.pt" ]; then
-    echo "Downloading YOLOv11 general model..."
-    wget "$YOLO_MODEL_URL"
+  MODEL_DIR="$REPO_DIR/models"
+  mkdir -p "$MODEL_DIR"
+  if [ ! -f "$MODEL_DIR/yolo11n.pt" ]; then
+    echo "Downloading YOLOv11 general model to $MODEL_DIR ..."
+    wget -O "$MODEL_DIR/yolo11n.pt" "$YOLO_MODEL_URL"
   else
-    echo "YOLOv11 model already downloaded, skipping."
+    echo "YOLOv11 model already downloaded in $MODEL_DIR, skipping."
   fi
 
   echo "SenseCraft AI Server setup completed."
