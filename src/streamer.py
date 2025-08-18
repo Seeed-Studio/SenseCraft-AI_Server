@@ -1221,6 +1221,15 @@ class StreamingHandler(BaseHTTPRequestHandler):
             rawFrame = camera.output.orig_img
             if not camera.infering and rawFrame is not None:
                 img = img_copy(rawFrame)
+                
+                # 绊线绘制和计数显示（无推理时也显示）
+                line_config = get_line_crossing_config()
+                if line_config and line_config.get("show_line", True):  # 默认显示绊线
+                    draw_line_crossing(img, line_config)
+                if line_config and line_config.get("show_counts", True):  # 默认显示计数
+                    draw_line_crossing_counts(
+                        img, get_line_crossing_counts(), (10, 100), line_config
+                    )
             else:
                 if env_helper.is_mqtt_on() and mqtt_driver is not None:
                     viewInfo = self.handle_view_info(result, uuid)
