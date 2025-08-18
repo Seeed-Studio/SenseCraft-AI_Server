@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # 设置镜像名称
-IMAGE=scas
+IMAGE_NAME=scas
+IMAGE=${IMAGE_NAME}:latest
 
 echo "=== SenseCraft AI Server 启动脚本 ==="
 
@@ -19,6 +20,25 @@ if [[ "$(docker images -q $IMAGE 2> /dev/null)" == "" ]]; then
     fi
 else
     echo "✅ 镜像 $IMAGE 已存在"
+    # 生成时间戳标签保存当前版本
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_TAG=${IMAGE_NAME}:backup_${TIMESTAMP}
+    
+    echo "📦 备份当前镜像为: $BACKUP_TAG"
+    docker tag $IMAGE $BACKUP_TAG
+    
+    echo "🔄 重新构建最新版本..."
+    echo "构建可能需要几分钟时间，请耐心等待..."
+    docker build -t $IMAGE .
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ 新版本镜像构建成功！"
+        echo "📋 当前版本: $IMAGE" 
+        echo "📋 备份版本: $BACKUP_TAG"
+    else
+        echo "❌ 镜像构建失败！"
+        exit 1
+    fi
 fi
 
 # 检测MQTT服务是否运行
