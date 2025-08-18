@@ -1277,18 +1277,6 @@ class StreamingHandler(BaseHTTPRequestHandler):
                                         logging.debug(
                                             f"检测到绊线穿越: track_id={track_id}, type={crossing_type}"
                                         )
-
-                                        # 绘制绊线和计数（根据配置决定是否显示）
-                        if line_config and line_config.get(
-                            "show_line", True
-                        ):  # 默认显示绊线
-                            draw_line_crossing(img, line_config)
-                        if line_config and line_config.get(
-                            "show_counts", True
-                        ):  # 默认显示计数
-                            draw_line_crossing_counts(
-                                img, get_line_crossing_counts(), (10, 100), line_config
-                            )
                         else:
                             logging.debug(
                                 f"绊线检测未启用或配置无效: enabled={line_config.get('enabled') if line_config else None}"
@@ -1300,6 +1288,15 @@ class StreamingHandler(BaseHTTPRequestHandler):
                 else:
                     logging.debug(
                         f"追踪条件不满足: track={camera.track}, show_trail={show_trail}, result.boxes={result.boxes is not None}"
+                    )
+
+                # 绊线绘制和计数显示（独立于追踪条件）
+                line_config = get_line_crossing_config()
+                if line_config and line_config.get("show_line", True):  # 默认显示绊线
+                    draw_line_crossing(img, line_config)
+                if line_config and line_config.get("show_counts", True):  # 默认显示计数
+                    draw_line_crossing_counts(
+                        img, get_line_crossing_counts(), (10, 100), line_config
                     )
 
             self.handle_fps_time(
