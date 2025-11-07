@@ -2,13 +2,14 @@ import logging
 import time
 import cv2
 from threading import Thread
+from queue import Queue, Empty
 from ultralytics import YOLO
 from output import StreamingOutput
 from rtsp_reader import RTSPReader
 
 
 class Camera:
-    def __init__(self, output: StreamingOutput, url, modelpath, task, classes=None, enable_diagnostics=False):
+    def __init__(self, output: StreamingOutput, url, modelpath, task, classes=None, enable_diagnostics=False, async_inference=True):
         self.output = output
         self.url = url
         self.modelpath = modelpath
@@ -17,6 +18,7 @@ class Camera:
         self.infering = True
         self.real_fps = None
         self.enable_diagnostics = enable_diagnostics
+        self.async_inference = async_inference  # 是否使用异步推理
 
         self.task = task or "detect"
         """
@@ -41,6 +43,13 @@ class Camera:
         self.infer_times = []  # 推理时间列表（最近100次）
         self.max_infer_time = 0.0
         self.avg_infer_time = 0.0
+        
+        # 异步推理相关
+        if self.async_inference:
+            self.inference_queue = Queue(maxsize=2)  # 最多保留2帧待推理
+            self.inference_thread = None
+            self.stop_inference = False
+            logging.info("启用异步推理模式：推理不会阻塞视频流读取")
 
     def __enter__(self):
         self.load_mode()
@@ -62,6 +71,13 @@ class Camera:
         self.stop_capture = False
         self.thread = Thread(target=self.capture)
         self.thread.start()
+        
+        # 如果启用异步推理，启动推理线程
+        if self.async_inference:
+            self.inference_thread = Thread(target=self._inference_worker, daemon=True)
+            self.inference_thread.start()
+            logging.info("异步推理线程已启动")
+        
         return self
 
     def load_mode(self):
@@ -119,6 +135,13 @@ class Camera:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop_capture = True
+        
+        # 停止异步推理线程
+        if self.async_inference:
+            self.stop_inference = True
+            if self.inference_thread and self.inference_thread.is_alive():
+                self.inference_thread.join(timeout=2)
+        
         self.thread.join()
         if self.cap:
             self.cap.release()
@@ -145,11 +168,26 @@ class Camera:
             if not ret:
                 self.handle_end()
             else:
-                infer_start = time.time() if self.enable_diagnostics else 0
-                self.infer(frame)
-                if self.enable_diagnostics and infer_start > 0:
-                    infer_time = time.time() - infer_start
-                    self._update_process_diagnostics(infer_time)
+                if self.async_inference:
+                    # 异步推理模式：将帧放入队列，不阻塞
+                    try:
+                        # 如果队列满了，丢弃最旧的帧，放入新帧
+                        if self.inference_queue.full():
+                            try:
+                                self.inference_queue.get_nowait()  # 丢弃最旧的帧
+                            except Empty:
+                                pass
+                        self.inference_queue.put_nowait(frame)
+                    except Exception as e:
+                        logging.warning(f"异步推理队列错误: {e}")
+                    # 异步模式下，读取帧的延迟不受推理影响
+                else:
+                    # 同步推理模式：阻塞直到推理完成
+                    infer_start = time.time() if self.enable_diagnostics else 0
+                    self.infer(frame)
+                    if self.enable_diagnostics and infer_start > 0:
+                        infer_time = time.time() - infer_start
+                        self._update_process_diagnostics(infer_time)
             self.adjust_fps(start)
             
             # 定期打印诊断信息
@@ -238,6 +276,7 @@ class Camera:
             'process_fps': round(self.process_fps, 2),
             'avg_infer_time_ms': round(self.avg_infer_time * 1000, 2),
             'max_infer_time_ms': round(self.max_infer_time * 1000, 2),
+            'async_inference': self.async_inference,
         }
         
         # 如果是 RTSP 流，添加源诊断信息
@@ -281,6 +320,7 @@ class Camera:
             logging.info(f"  处理帧率: {diag['process_fps']} fps")
             logging.info(f"  平均推理时间: {diag['avg_infer_time_ms']} ms")
             logging.info(f"  最大推理时间: {diag['max_infer_time_ms']} ms")
+            logging.info(f"  推理模式: {'异步（不阻塞）' if diag['async_inference'] else '同步（阻塞）'}")
             logging.info("")
             logging.info("【对比分析】")
             if 'fps_difference' in diag:
@@ -294,9 +334,16 @@ class Camera:
             if diag['source_fps'] < 10:
                 logging.warning("  ⚠️  源帧率较低（<10fps），可能是源端问题")
             if diag['process_fps'] < diag['source_fps'] * 0.8:
-                logging.warning("  ⚠️  处理帧率明显低于源帧率，可能是处理瓶颈（推理速度慢）")
+                if not diag['async_inference']:
+                    logging.warning("  ⚠️  处理帧率明显低于源帧率，可能是处理瓶颈（推理速度慢）")
+                    logging.info("  💡 建议：启用异步推理模式（async_inference=True）可减少推理对延迟的影响")
+                else:
+                    logging.warning("  ⚠️  处理帧率明显低于源帧率，推理队列可能积压")
             if diag['avg_infer_time_ms'] > 100:
-                logging.warning("  ⚠️  推理时间较长（>100ms），可能是模型或硬件性能问题")
+                if not diag['async_inference']:
+                    logging.warning("  ⚠️  推理时间较长（>100ms），建议启用异步推理模式以减少延迟影响")
+                else:
+                    logging.warning("  ⚠️  推理时间较长（>100ms），但异步模式已启用，不影响视频流读取延迟")
         else:
             logging.info("【处理端信息】")
             logging.info(f"  处理帧率: {diag['process_fps']} fps")
@@ -305,7 +352,55 @@ class Camera:
         
         logging.info("=" * 50)
     
+    def _inference_worker(self):
+        """异步推理工作线程"""
+        while not self.stop_inference:
+            try:
+                # 从队列获取帧进行推理
+                frame = self.inference_queue.get(timeout=0.1)
+                
+                if not self.infering:
+                    # 如果推理被禁用，直接输出原始帧
+                    self.output.write([None], frame)
+                    continue
+                
+                infer_start = time.time() if self.enable_diagnostics else 0
+                
+                # 执行推理
+                if self.track:
+                    results = self.model.track(
+                        frame,
+                        device="0",
+                        classes=[0],
+                        persist=True,
+                        tracker="bytetrack.yaml",
+                        verbose=False,
+                        **self.predictParams
+                    )
+                else:
+                    results = self.model.predict(
+                        frame, device="0", verbose=False, classes=[0], **self.predictParams
+                    )
+                
+                # 输出结果
+                self.output.write(results)
+                
+                # 更新诊断统计
+                if self.enable_diagnostics and infer_start > 0:
+                    infer_time = time.time() - infer_start
+                    self._update_process_diagnostics(infer_time)
+                    
+            except Empty:
+                # 队列为空，继续等待
+                continue
+            except Exception as e:
+                logging.error(f"异步推理错误: {e}")
+                continue
+    
     def infer(self, frame):
+        """
+        同步推理方法（用于非异步模式）
+        """
         # if stop infering, output is the original frame
         if not self.infering:
             self.output.write([None], frame)
