@@ -4,10 +4,7 @@ import os
 import json
 import sys
 import traceback
-from constant import (
-    DEFAULT_MODEL_LIST,
-    MODEL_FORMAT_MAP,
-)
+from uuid import uuid4
 import env_helper
 
 # default project path
@@ -18,6 +15,49 @@ ALLOWED_EXTENSIONS = set(["mp4", "h264", "mov", "avi", "png", "jpg", "jpeg"])
 
 def allowed_source(filename):
     return "." in filename and filename.rsplit(".", 1)[1] in ALLOWED_EXTENSIONS
+
+
+STREAM_FIELD_DEFAULTS = {
+    "name": "默认流",
+    "enabled": True,
+    "src": "sample.mp4",
+    "model_id": "",
+    "conf": "0.25",
+    "max_det": "300",
+    "half": "0",
+    "show_fps": "1",
+    "show_time": "1",
+    "show_box": "1",
+    "box_color": "orange",
+    "track": "1",
+    "show_trail": "1",
+    "trail_length": "50",
+    "trail_thickness": "2",
+    "trail_color": "blue",
+    # 是否启用诊断信息（处理帧率/推理时长等）
+    "enable_diagnostics": "1",
+    # 推理分辨率（传给 ultralytics 的 imgsz），为空则使用模型默认
+    "imgsz": "",
+}
+
+STREAM_FIELD_ORDER = [
+    "src",
+    "model_id",
+    "conf",
+    "max_det",
+    "half",
+    "show_fps",
+    "show_time",
+    "show_box",
+    "box_color",
+    "track",
+    "show_trail",
+    "trail_length",
+    "trail_thickness",
+    "trail_color",
+    "enable_diagnostics",
+    "imgsz",
+]
 
 
 class FileMgr:
@@ -172,15 +212,14 @@ class FileMgr:
                 loaded_config = json.load(f)
                 # 更新配置缓存，保留现有字段
                 self.configCache.update(loaded_config)
-            # 添加模型信息到配置中（每次获取时都更新）
-            self.configCache["models"] = json.loads(json.dumps(self.modelJson))
         except Exception as e:
             logging.error(str(traceback.format_exc()))
             logging.error(str(e))
             logging.error("加载 application.json 失败，使用默认配置")
-            # 确保默认配置包含必要的字段
-            if not self.configCache.get("streams"):
-                self.configCache["streams"] = []
+        finally:
+            self._ensure_streams(self.configCache)
+            # 添加模型信息到配置中（每次获取时都更新）
+            self.configCache["models"] = json.loads(json.dumps(self.modelJson))
         return self.configCache
 
     def set_appconfig(self, jsonstr):
@@ -192,17 +231,14 @@ class FileMgr:
         
         # 更新配置缓存，保存所有前端发送的字段
         self.configCache.update(jsonData)
-        
-        # 确保streams字段存在
-        if not self.configCache.get("streams"):
-            self.configCache["streams"] = []
+        self._ensure_streams(self.configCache)
         
         try:
             # 移除models部分，避免保存到文件
             if "models" in self.configCache:
                 del self.configCache["models"]
             with open(self.appconfig_path(), "w") as f:
-                f.write(json.dumps(self.configCache, indent=2))
+                f.write(json.dumps(self.configCache, indent=2, ensure_ascii=False))
         except Exception as e:
             logging.error(str(traceback.format_exc()))
             logging.error(str(e))
@@ -325,3 +361,56 @@ class FileMgr:
                 content = f.read()
                 return (mime_type, content)
         return (mime_type, None)
+
+    def _ensure_streams(self, config):
+        """
+        确保 streams 字段存在并补全默认值，同时保持向后兼容
+        """
+        streams = config.get("streams")
+        if not isinstance(streams, list):
+            streams = []
+
+        if not streams:
+            # 旧版本配置迁移：将顶层字段转换为一个流
+            fallback_stream = {}
+            for key in STREAM_FIELD_ORDER:
+                if config.get(key) is not None:
+                    fallback_stream[key] = str(config.get(key))
+            streams = [self._build_stream_defaults(fallback_stream, index=0)]
+        else:
+            normalized = []
+            for idx, stream in enumerate(streams):
+                normalized.append(self._build_stream_defaults(stream or {}, idx))
+            streams = normalized
+
+        config["streams"] = streams
+
+        # 激活流 ID
+        active_id = config.get("active_stream_id")
+        if active_id not in [s["id"] for s in streams]:
+            active_id = streams[0]["id"]
+        config["active_stream_id"] = active_id
+        primary_stream = next((s for s in streams if s["id"] == active_id), streams[0])
+
+        # 将主流字段同步到顶层，兼容旧逻辑
+        for key in STREAM_FIELD_ORDER:
+            config[key] = primary_stream.get(key, STREAM_FIELD_DEFAULTS.get(key))
+
+    def _build_stream_defaults(self, data, index=0):
+        stream = STREAM_FIELD_DEFAULTS.copy()
+        stream.update({k: str(v) if isinstance(v, (int, float)) else v for k, v in data.items() if v is not None})
+        if not stream.get("id"):
+            stream["id"] = f"stream-{uuid4().hex[:8]}"
+        if not stream.get("name"):
+            stream["name"] = f"流{index + 1}"
+        stream["enabled"] = bool(stream.get("enabled", True))
+        return stream
+
+    def stream_by_id(self, stream_id: str | None):
+        if not stream_id:
+            return None
+        config = self.get_appConfig()
+        for stream in config.get("streams", []):
+            if stream.get("id") == stream_id:
+                return stream
+        return None

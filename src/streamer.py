@@ -425,7 +425,8 @@ def draw_track_trails(img, track_history, trail_color=None, trail_thickness=2):
         parse_color_name(trail_color) if isinstance(trail_color, str) else trail_color
     )
     min_thickness = 1
-    for track_id, points in track_history.items():
+    # 避免遍历过程中 track_history 被其他线程增删导致 RuntimeError
+    for track_id, points in list(track_history.items()):
         if len(points) > 1:
             base_color = (
                 generate_color_from_id(track_id)
@@ -758,6 +759,7 @@ class StreamingHandler(BaseHTTPRequestHandler):
         src = fileMgr.sampleVideoPath
         fps = 30
         quality = 50
+        # NOTE: model_id / conf / max_det 等默认值只是兜底，实际优先使用 streams 配置
         model_id = "80-object-detect"  # object detect
         show_time = False  # show timestamp or not
         show_fps = False  # show fps or not
@@ -771,6 +773,10 @@ class StreamingHandler(BaseHTTPRequestHandler):
         half = False  # use half or not
         conf = 0.25  # degree of confidence
         max_det = 300  # max detect amount
+        # 推理分辨率（传给 ultralytics 的 imgsz）
+        imgsz = None
+        # 是否启用 Camera 诊断信息
+        enable_diagnostics = True
         uuid = str(uuid4())  # uuid for mqtt to identify output belongs which stream
         font_scale = 1  # text font scale
         thickness = 3  # text thickness
@@ -781,7 +787,42 @@ class StreamingHandler(BaseHTTPRequestHandler):
             # load option params from url
             query = self.try_get_urlparams()
             logging.debug(query)
-            # TODO: How to be more elegant to deal with this
+
+            stream_config = None
+            if query.get("stream_id"):
+                stream_id = query.get("stream_id")
+                stream_config = fileMgr.stream_by_id(stream_id)
+                if stream_config:
+                    logging.debug(f"使用 stream_id={stream_id} 的配置启动流")
+                else:
+                    logging.warning(f"未找到 stream_id={stream_id} 的配置，继续使用默认配置")
+
+            # 先应用 stream 配置，再使用 URL 参数覆盖
+            if stream_config:
+                src = fileMgr.find_source_path(stream_config.get("src", src))
+                model_id = stream_config.get("model_id", model_id)
+                track = str(stream_config.get("track", "0")) != "0"
+                show_trail = str(stream_config.get("show_trail", "0")) != "0"
+                trail_length = int(stream_config.get("trail_length", trail_length))
+                trail_thickness = int(stream_config.get("trail_thickness", trail_thickness))
+                trail_color = stream_config.get("trail_color", trail_color)
+                box_color = stream_config.get("box_color", box_color)
+                half = str(stream_config.get("half", "0")) != "0"
+                conf = float(stream_config.get("conf", conf))
+                max_det = int(stream_config.get("max_det", max_det))
+                show_box = str(stream_config.get("show_box", "1")) != "0"
+                show_time = str(stream_config.get("show_time", "0")) != "0"
+                show_fps = str(stream_config.get("show_fps", "0")) != "0"
+                uuid = stream_config.get("uuid", uuid)
+                # 新增：启用诊断和推理分辨率
+                enable_diagnostics = str(stream_config.get("enable_diagnostics", "1")) != "0"
+                try:
+                    _imgsz_val = stream_config.get("imgsz", "")
+                    if _imgsz_val not in (None, "", "0"):
+                        imgsz = int(_imgsz_val)
+                except Exception:
+                    imgsz = None
+
             if query.get("src"):
                 src = fileMgr.find_source_path(query.get("src"))
             if query.get("fps"):
@@ -808,6 +849,11 @@ class StreamingHandler(BaseHTTPRequestHandler):
                 conf = float(query.get("conf", 0.25))
             if query.get("max_det"):
                 max_det = int(query.get("max_det", "300"))
+            if query.get("imgsz"):
+                try:
+                    imgsz = int(query.get("imgsz"))
+                except Exception:
+                    pass
             if query.get("show_box"):
                 show_box = int(query.get("show_box", "1")) > 0
             if query.get("uuid"):
@@ -826,6 +872,8 @@ class StreamingHandler(BaseHTTPRequestHandler):
                 txt_color = int(query.get("txt_color", "3"))
             if query.get("way"):
                 way = int(query.get("way", "1"))
+            if query.get("enable_diagnostics"):
+                enable_diagnostics = int(query.get("enable_diagnostics", "1")) > 0
             logging.debug(
                 "load user config successed. src = {}, fps = {}, quality = {}, model_id = {}, track = {}, show_trail = {}, trail_length = {}, trail_thickness = {}, trail_color = {}, box_color = {}, half = {}, conf = {}, max_det = {}, show_box = {}, uuid = {}, show_fps = {}, infering = {}".format(
                     src,
@@ -874,6 +922,9 @@ class StreamingHandler(BaseHTTPRequestHandler):
             "txt_color": txt_color,
             "way": way,
             "infering": infering,
+            "imgsz": imgsz,
+            "enable_diagnostics": enable_diagnostics,
+            "stream_id": query.get("stream_id"),
         }
 
     def do_GET(self):
@@ -907,6 +958,8 @@ class StreamingHandler(BaseHTTPRequestHandler):
                 txt_color = cfg["txt_color"]
                 way = cfg["way"]
                 infering = cfg["infering"]
+                imgsz = cfg["imgsz"]
+                enable_diagnostics = cfg.get("enable_diagnostics", True)
                 modelpath = fileMgr.get_modelpath(model_id)
                 if not modelpath:
                     logging.error("AI model not found.")
@@ -916,7 +969,13 @@ class StreamingHandler(BaseHTTPRequestHandler):
                 if show_box is None:
                     show_box = not task in ["segment", "pose"]
                 output = StreamingOutput()
-                with Camera(output, url=src, modelpath=modelpath, task=task) as camera:
+                with Camera(
+                    output,
+                    url=src,
+                    modelpath=modelpath,
+                    task=task,
+                    enable_diagnostics=enable_diagnostics,
+                ) as camera:
                     camera.track = track
                     # https://docs.ultralytics.com/modes/predict/#inference-sources
                     camera.predictParams = {
@@ -924,6 +983,8 @@ class StreamingHandler(BaseHTTPRequestHandler):
                         "conf": conf,
                         "max_det": max_det,
                         "iou": 0.1,
+                        # 可选推理分辨率：为空则使用模型默认
+                        **({"imgsz": imgsz} if imgsz else {}),
                     }
                     if camera.mode == "image" and camera.pic is None:
                         logging.error("Image Source not found.")

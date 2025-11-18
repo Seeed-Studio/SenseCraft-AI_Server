@@ -11,6 +11,46 @@ class IndustrialMonitor {
     this.isMqttListening = false;
   }
 
+  createStreamConfig(overrides = {}, index = 0) {
+    const baseId = overrides.id || overrides.stream_id || `stream-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const defaults = {
+      id: baseId,
+      name: `流${index + 1}`,
+      enabled: true,
+      src: 'sample.mp4',
+      model_id: '',
+      conf: '0.25',
+      max_det: '300',
+      half: '0',
+      show_fps: '1',
+      show_time: '1',
+      show_box: '1',
+      box_color: 'orange',
+      track: '1',
+      show_trail: '1',
+      trail_length: '50',
+      trail_thickness: '2',
+      trail_color: 'blue',
+      uuid: this.generateUUID(),
+    };
+    const stream = { ...defaults, ...overrides };
+    if (!stream.id) {
+      stream.id = baseId;
+    }
+    if (!stream.name) {
+      stream.name = `流${index + 1}`;
+    }
+    stream.enabled = stream.enabled !== false;
+    return stream;
+  }
+
+  normalizeStreams(streams = [], fallback = {}) {
+    if (!Array.isArray(streams) || streams.length === 0) {
+      return [this.createStreamConfig(fallback, 0)];
+    }
+    return streams.map((stream, index) => this.createStreamConfig({ ...fallback, ...stream }, index));
+  }
+
   // 显示通知
   showNotification(message, type = 'info') {
     const notification = document.createElement('div');
@@ -67,7 +107,6 @@ class IndustrialMonitor {
     const baseUrl = window.location.origin;
     const urlParams = new URLSearchParams();
 
-    // 合并默认参数和传入参数
     const defaultParams = {
       infering: '1',
       conf: '0.25',
@@ -78,13 +117,58 @@ class IndustrialMonitor {
       trail_length: '50',
       trail_thickness: '2',
       box_color: 'orange',
-      trail_color: 'blue'
+      trail_color: 'blue',
     };
 
-    Object.assign(defaultParams, params);
+    const allowedKeys = new Set([
+      'infering',
+      'conf',
+      'max_det',
+      'show_box',
+      'track',
+      'show_trail',
+      'trail_length',
+      'trail_thickness',
+      'box_color',
+      'trail_color',
+      'src',
+      'model_id',
+      'show_time',
+      'show_fps',
+      'half',
+      'uuid',
+      'stream_id',
+    ]);
 
-    // 添加所有参数到URL
-    Object.entries(defaultParams).forEach(([key, value]) => {
+    const booleanKeys = new Set(['show_box', 'track', 'show_trail', 'show_time', 'show_fps', 'half', 'infering']);
+    const finalParams = { ...defaultParams };
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) {
+        return;
+      }
+      if (typeof value === 'object') {
+        return;
+      }
+      const normalizedKey = key === 'id' ? 'stream_id' : key;
+      if (!allowedKeys.has(normalizedKey)) {
+        return;
+      }
+      let normalizedValue = value;
+      if (booleanKeys.has(normalizedKey)) {
+        normalizedValue = value === true || value === '1' || value === 1 ? '1' : '0';
+      }
+      finalParams[normalizedKey] = normalizedValue;
+    });
+
+    if (!finalParams.stream_id) {
+      const sid = params.stream_id || params.id;
+      if (sid) {
+        finalParams.stream_id = sid;
+      }
+    }
+
+    Object.entries(finalParams).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         urlParams.append(key, value);
       }

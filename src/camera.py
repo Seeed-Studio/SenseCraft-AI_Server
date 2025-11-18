@@ -68,6 +68,15 @@ class Camera:
             )
         )
         self.model = YOLO(self.modelpath, task=self.task)
+        try:
+            if str(self.modelpath).endswith(".engine"):
+                logging.info("使用 TensorRT Engine 模型进行推理: %s", self.modelpath)
+            elif str(self.modelpath).endswith(".onnx"):
+                logging.info("使用 ONNX 模型进行推理: %s", self.modelpath)
+            else:
+                logging.info("使用 PyTorch 模型进行推理: %s", self.modelpath)
+        except Exception:
+            pass
         self.stop_capture = False
         self.thread = Thread(target=self.capture)
         self.thread.start()
@@ -112,7 +121,7 @@ class Camera:
                 reconnect_interval=self.reconnect_interval, 
                 enable_diagnostics=self.enable_diagnostics,
                 use_hw_accel=None,  # None = 自动检测，Jetson 设备会自动启用
-                smoothness_mode='balanced'  # 默认平衡模式，可根据需要调整
+                smoothness_mode='low_latency'  # 默认平衡模式，可根据需要调整
             )
         else:
             self.cap = cv2.VideoCapture(self.url)
